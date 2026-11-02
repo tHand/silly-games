@@ -1,0 +1,22 @@
+<!doctype html><html lang=en><meta charset=utf-8><meta content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" name=viewport><title>POC2</title><script type=module>import init,*as bindings from"/silly-games/002/poc2-ffdac12f37eb78b1.js";const wasm=await init({module_or_path:`/silly-games/002/poc2-81dbae51356279dd_bg.wasm`});window.wasmBindings=bindings,dispatchEvent(new CustomEvent(`TrunkApplicationStarted`,{detail:{wasm}}));</script><script>// Sound playback for the Wasm build (called from src/sounds.rs). Web Audio mixes on its own
+// audio thread, so overlapping sounds don't depend on the game's frame rate.
+(function(){
+// On iPhone, Web Audio counts as "ambient" sound by default, which the ring/silent switch
+// mutes. As "playback" (like a music player) it plays with the switch on silent (iOS 17+).
+navigator.audioSession&&(navigator.audioSession.type=`playback`);let ctx=new AudioContext,master=ctx.createDynamicsCompressor();
+// Each sound is synthesized in Rust and handed over as raw samples (a view into Wasm memory;
+// copyToChannel copies it), so there's no decode step and playback starts immediately.
+master.connect(ctx.destination),globalThis.fireworksPlaySamples=(samples,sampleRate,volume,pan)=>{let buffer=ctx.createBuffer(1,samples.length,sampleRate);buffer.copyToChannel(samples,0);let source=ctx.createBufferSource();source.buffer=buffer;let gain=ctx.createGain();gain.gain.value=volume;let panner=ctx.createStereoPanner();panner.pan.value=pan,source.connect(gain).connect(panner).connect(master),source.start()};
+// Browsers start audio suspended until a user gesture. iOS only counts some events (a touch
+// ending, a click, a key) and, on older versions, also wants a sound started inside one,
+// so each gesture resumes the context and plays a moment of silence until it's running.
+// Browsers also pause audio again on their own (switching apps, locking the screen, a call,
+// another app's sound), so the listeners stay for good, and audio is restarted whenever
+// the page comes back into view or the browser reports it paused. Events that don't count
+// make resume() reject, which is harmless, so it's caught.
+let unlock=()=>{if(ctx.state===`running`)return;ctx.resume().catch(()=>{});let silence=ctx.createBufferSource();silence.buffer=ctx.createBuffer(1,1,ctx.sampleRate),silence.connect(ctx.destination),silence.start()};[`pointerdown`,`pointerup`,`touchstart`,`touchend`,`click`,`keydown`].forEach(name=>document.addEventListener(name,unlock,!0));
+// Hidden, the game stops but its voices would play on, so audio pauses until it's back.
+let visible=()=>document.visibilityState===`visible`;
+// Paused by the browser ("suspended", or "interrupted" on iOS): try to resume while visible.
+document.addEventListener(`visibilitychange`,()=>visible()?unlock():ctx.suspend().catch(()=>{})),ctx.addEventListener(`statechange`,()=>visible()&&ctx.state!==`running`&&ctx.state!==`closed`&&ctx.resume().catch(()=>{}))})();</script><style>html,body{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;background:#1a1a26;height:100%;margin:0;overflow:hidden}canvas{touch-action:none;outline:none;width:100%;height:100%;display:block}#loading{color:#8a93c4;pointer-events:none;place-items:center;font:16px system-ui,sans-serif;display:grid;position:fixed;inset:0}</style><link crossorigin href=/silly-games/002/poc2-ffdac12f37eb78b1.js integrity=sha384-u/XoEafssAdyXOMbpndvFHMAbBWgrT4pR3dXymmGkJuFeUXx4d2vVGOtsBmSQPBZ rel=modulepreload><link as=fetch crossorigin href=/silly-games/002/poc2-81dbae51356279dd_bg.wasm integrity=sha384-M60sdT0rWha7DaW4XNHvxjQytLXwZRe2DqIHG0AP4dy62BNGmryjaqbROAzhvVtc rel=preload type=application/wasm></head><body><div id=loading>Loading…</div><canvas id=bevy tabindex=0></canvas><script>// Trunk fires this once the Wasm module has been loaded and started.
+addEventListener(`TrunkApplicationStarted`,()=>document.getElementById(`loading`)?.remove());</script></body></html>
